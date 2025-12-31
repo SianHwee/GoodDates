@@ -58,11 +58,44 @@
                     <input type="date" id="endDate" required>
                 </div>
                 <button type="submit" id="submitBtn">Find Good Dates</button>
+            <p class="help-text" id="profileNotice"></p>
             </form>
+        </section>
+        <section id="bazi-section" class="hidden">
+            <h2>Your BaZi Chart</h2>
+            <div id="baziChartContainer"></div>
+            <button type="button" id="overrideBtn">Override BaZi Chart</button>
+            <div id="overrideContainer" class="hidden">
+                <form id="overrideForm" onsubmit="return false;">
+                    <p>You can manually specify the Heavenly Stem and Earthly Branch for each pillar.</p>
+                    <div class="override-row">
+                        <label>Year:</label>
+                        <select id="overrideYearStem"></select>
+                        <select id="overrideYearBranch"></select>
+                    </div>
+                    <div class="override-row">
+                        <label>Month:</label>
+                        <select id="overrideMonthStem"></select>
+                        <select id="overrideMonthBranch"></select>
+                    </div>
+                    <div class="override-row">
+                        <label>Day:</label>
+                        <select id="overrideDayStem"></select>
+                        <select id="overrideDayBranch"></select>
+                    </div>
+                    <div class="override-row">
+                        <label>Hour:</label>
+                        <select id="overrideHourStem"></select>
+                        <select id="overrideHourBranch"></select>
+                    </div>
+                    <button type="button" id="applyOverrideBtn">Recalculate Good Dates</button>
+                </form>
+            </div>
         </section>
         <section id="results-section" class="hidden">
             <h2>Recommended Dates &amp; Hours</h2>
             <div id="listResults"></div>
+            <div id="explanations"></div>
             <h2>Calendar View</h2>
             <div id="calendarContainer"></div>
         </section>

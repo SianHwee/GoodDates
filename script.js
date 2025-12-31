@@ -12,6 +12,91 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultsSection = document.getElementById('results-section');
     const listContainer = document.getElementById('listResults');
     const calendarContainer = document.getElementById('calendarContainer');
+    const overrideBtn = document.getElementById('overrideBtn');
+    const overrideContainer = document.getElementById('overrideContainer');
+    const applyOverrideBtn = document.getElementById('applyOverrideBtn');
+
+    // Define global arrays for stems and branches for override dropdowns
+    const stemsList = ['Jia','Yi','Bing','Ding','Wu','Ji','Geng','Xin','Ren','Gui'];
+    const branchesList = ['Zi','Chou','Yin','Mao','Chen','Si','Wu','Wei','Shen','You','Xu','Hai'];
+
+    // Populate override select options on load
+    function populateOverrideOptions() {
+        const pillars = ['Year','Month','Day','Hour'];
+        pillars.forEach(pillar => {
+            const stemSelect = document.getElementById(`override${pillar}Stem`);
+            const branchSelect = document.getElementById(`override${pillar}Branch`);
+            stemsList.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s;
+                opt.textContent = s;
+                stemSelect.appendChild(opt);
+            });
+            branchesList.forEach(b => {
+                const opt = document.createElement('option');
+                opt.value = b;
+                opt.textContent = b;
+                branchSelect.appendChild(opt);
+            });
+        });
+    }
+
+    // Toggle override container visibility
+    overrideBtn.addEventListener('click', () => {
+        overrideContainer.classList.toggle('hidden');
+    });
+
+    // Handle applying override
+    applyOverrideBtn.addEventListener('click', () => {
+        // Gather override values
+        const overrideChart = [
+            { pillar: 'Year', stem: document.getElementById('overrideYearStem').value, branch: document.getElementById('overrideYearBranch').value },
+            { pillar: 'Month', stem: document.getElementById('overrideMonthStem').value, branch: document.getElementById('overrideMonthBranch').value },
+            { pillar: 'Day', stem: document.getElementById('overrideDayStem').value, branch: document.getElementById('overrideDayBranch').value },
+            { pillar: 'Hour', stem: document.getElementById('overrideHourStem').value, branch: document.getElementById('overrideHourBranch').value }
+        ];
+        // Save override chart to localStorage
+        try {
+            localStorage.setItem('baziOverride', JSON.stringify(overrideChart));
+        } catch (e) {
+            console.warn('Could not save override chart', e);
+        }
+        // Render override chart
+        renderBaZiChart(overrideChart);
+        document.getElementById('bazi-section').classList.remove('hidden');
+        // Recalculate good dates with same range and activities using override (still placeholder logic)
+        // Fetch current form values
+        const startDateStr = document.getElementById('startDate').value;
+        const endDateStr = document.getElementById('endDate').value;
+        const activitiesSelect = document.getElementById('activities');
+        const selectedActivities = Array.from(activitiesSelect.selectedOptions).map(opt => opt.value);
+        const startDate = new Date(startDateStr);
+        const endDate = new Date(endDateStr);
+        // Validate dates
+        if (!startDateStr || !endDateStr || endDate < startDate) {
+            alert('Please ensure start and end dates are selected correctly.');
+            return;
+        }
+        const rangeDays = Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24));
+        if (rangeDays > 92) {
+            alert('Please limit your date range to no more than 3 months.');
+            return;
+        }
+        // Generate new placeholder good dates
+        const goodDates = generateGoodDates(startDate, endDate, selectedActivities);
+        // Update results and explanations
+        renderListResults(goodDates, listContainer);
+        renderExplanations(goodDates);
+        renderCalendarRange(goodDates, calendarContainer, startDate, endDate);
+        resultsSection.classList.remove('hidden');
+        resultsSection.scrollIntoView({behavior:'smooth'});
+    });
+
+    // Call population of override options on load
+    populateOverrideOptions();
+
+    // Load previously saved profile if available
+    loadProfile();
 
     form.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -47,6 +132,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Generate placeholder good dates including suggested hours
         const goodDates = generateGoodDates(startDate, endDate, selectedActivities);
+
+        // Save profile information for future visits
+        saveProfile({ dob: dobStr, time: timeStr, gender, location });
+
+        // Calculate and render BaZi chart
+        const baziChart = calculateBaZi(dobStr, timeStr);
+        renderBaZiChart(baziChart);
+        document.getElementById('bazi-section').classList.remove('hidden');
+
+        // Generate explanations for each good date/time
+        renderExplanations(goodDates);
 
         // Render results
         renderListResults(goodDates, listContainer);
@@ -86,8 +182,10 @@ function generateGoodDates(start, end, activities) {
 
     // Predefined time slots for demonstration purposes
     const timeSlots = [
+        '07:00–08:30',
         '09:00–11:00',
         '13:00–15:00',
+        '16:00–18:00',
         '19:00–21:00'
     ];
 
@@ -100,9 +198,19 @@ function generateGoodDates(start, end, activities) {
         if (!selectedDates.has(dateKey)) {
             selectedDates.add(dateKey);
             // Build hour recommendations per activity
-            const hourRecommendations = activities.map(act => {
-                const slot = timeSlots[Math.floor(Math.random() * timeSlots.length)];
-                return { activity: act, time: slot };
+            // Generate multiple time slots per activity to offer more options per day
+            const hourRecommendations = [];
+            activities.forEach(act => {
+                // pick two unique slots for each activity
+                const usedSlots = new Set();
+                for (let k = 0; k < 2; k++) {
+                    let slot;
+                    do {
+                        slot = timeSlots[Math.floor(Math.random() * timeSlots.length)];
+                    } while (usedSlots.has(slot));
+                    usedSlots.add(slot);
+                    hourRecommendations.push({ activity: act, time: slot });
+                }
             });
             results.push({
                 date: new Date(candidate),
@@ -186,6 +294,150 @@ function generateActivityName(code) {
         case 'health': return 'Health & Medical';
         default: return code;
     }
+}
+
+/**
+ * Save user profile information in localStorage.
+ *
+ * @param {Object} data - Object containing dob, time, gender and location
+ */
+function saveProfile(data) {
+    try {
+        localStorage.setItem('baziProfile', JSON.stringify(data));
+        document.getElementById('profileNotice').textContent = 'Profile saved for future visits.';
+    } catch (e) {
+        console.warn('Could not save profile', e);
+    }
+}
+
+/**
+ * Load user profile information from localStorage and prefill the form.
+ */
+function loadProfile() {
+    const notice = document.getElementById('profileNotice');
+    try {
+        const data = localStorage.getItem('baziProfile');
+        if (data) {
+            const profile = JSON.parse(data);
+            if (profile.dob) document.getElementById('dob').value = profile.dob;
+            if (profile.time) document.getElementById('birthTime').value = profile.time;
+            if (profile.gender) document.getElementById('gender').value = profile.gender;
+            if (profile.location) document.getElementById('location').value = profile.location;
+            notice.textContent = 'Loaded your saved profile. You can update any field if needed.';
+        }
+        // Load override chart if present
+        const override = localStorage.getItem('baziOverride');
+        if (override) {
+            const chart = JSON.parse(override);
+            // Prefill override selects
+            chart.forEach(item => {
+                const stemSelect = document.getElementById(`override${item.pillar}Stem`);
+                const branchSelect = document.getElementById(`override${item.pillar}Branch`);
+                if (stemSelect && branchSelect) {
+                    stemSelect.value = item.stem;
+                    branchSelect.value = item.branch;
+                }
+            });
+            // Display override chart in BaZi section
+            renderBaZiChart(chart);
+            document.getElementById('bazi-section').classList.remove('hidden');
+            document.getElementById('overrideContainer').classList.remove('hidden');
+        }
+    } catch (e) {
+        console.warn('Could not load profile', e);
+    }
+}
+
+/**
+ * Calculate a simplified BaZi (Four Pillars) chart based on date and time of birth.
+ * This implementation uses basic modular arithmetic to map date/time to
+ * Heavenly stems and Earthly branches. It is for demonstration only.
+ *
+ * @param {string} dob - Date of birth in YYYY-MM-DD format
+ * @param {string} time - Birth time in HH:MM format
+ * @returns {Array<{pillar: string, stem: string, branch: string}>}
+ */
+function calculateBaZi(dob, time) {
+    const stems = ['Jia', 'Yi', 'Bing', 'Ding', 'Wu', 'Ji', 'Geng', 'Xin', 'Ren', 'Gui'];
+    const branches = ['Zi', 'Chou', 'Yin', 'Mao', 'Chen', 'Si', 'Wu', 'Wei', 'Shen', 'You', 'Xu', 'Hai'];
+    const dateParts = dob.split('-').map(Number);
+    const timeParts = time.split(':').map(Number);
+    const year = dateParts[0];
+    const month = dateParts[1];
+    const day = dateParts[2];
+    const hour = timeParts[0];
+    // Compute indices using offsets (the year 4 corresponds to Jia Zi cycle start of 1984)
+    const yearStemIndex = (year - 4) % 10;
+    const yearBranchIndex = (year - 4) % 12;
+    const monthStemIndex = (month + yearStemIndex) % 10;
+    const monthBranchIndex = (month + 1) % 12;
+    const dayStemIndex = (day + monthStemIndex) % 10;
+    const dayBranchIndex = (day + monthBranchIndex) % 12;
+    // Hour pillar: determine branch by two-hour block; stems cycle every 10 hours
+    const hourBlock = Math.floor((hour + 1) / 2) % 12;
+    const hourStemIndex = (dayStemIndex + hourBlock) % 10;
+    const hourBranchIndex = hourBlock;
+    return [
+        { pillar: 'Year', stem: stems[(yearStemIndex + 10) % 10], branch: branches[(yearBranchIndex + 12) % 12] },
+        { pillar: 'Month', stem: stems[(monthStemIndex + 10) % 10], branch: branches[(monthBranchIndex + 12) % 12] },
+        { pillar: 'Day', stem: stems[(dayStemIndex + 10) % 10], branch: branches[(dayBranchIndex + 12) % 12] },
+        { pillar: 'Hour', stem: stems[(hourStemIndex + 10) % 10], branch: branches[(hourBranchIndex + 12) % 12] }
+    ];
+}
+
+/**
+ * Render the BaZi chart into the designated container.
+ *
+ * @param {Array<{pillar: string, stem: string, branch: string}>} chart
+ */
+function renderBaZiChart(chart) {
+    const container = document.getElementById('baziChartContainer');
+    container.innerHTML = '';
+    const table = document.createElement('table');
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    ['Pillar', 'Heavenly Stem', 'Earthly Branch'].forEach(text => {
+        const th = document.createElement('th');
+        th.textContent = text;
+        headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+    const tbody = document.createElement('tbody');
+    chart.forEach(item => {
+        const row = document.createElement('tr');
+        ['pillar', 'stem', 'branch'].forEach(key => {
+            const td = document.createElement('td');
+            td.textContent = item[key];
+            row.appendChild(td);
+        });
+        tbody.appendChild(row);
+    });
+    table.appendChild(tbody);
+    container.appendChild(table);
+}
+
+/**
+ * Generate simple explanations for each good date/time and render them in a list.
+ *
+ * @param {Array<{date: Date, reasons: string, hours: Array<{activity: string, time: string}>}>} goodDates
+ */
+function renderExplanations(goodDates) {
+    const container = document.getElementById('explanations');
+    container.innerHTML = '';
+    const ul = document.createElement('ul');
+    goodDates.forEach(item => {
+        const dateStr = item.date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+        let explanation = `On ${dateStr}, the alignment of your BaZi chart suggests favorable energies. Recommended times:`;
+        item.hours.forEach(hr => {
+            const activityName = generateActivityName(hr.activity);
+            explanation += ` ${activityName} between ${hr.time};`;
+        });
+        const li = document.createElement('li');
+        li.textContent = explanation;
+        ul.appendChild(li);
+    });
+    container.appendChild(ul);
 }
 
 /**
