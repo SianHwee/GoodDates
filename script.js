@@ -37,13 +37,20 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('End date must be after the start date.');
             return;
         }
+        // Enforce a maximum range of 3 months (~92 days). If exceeded, prompt the user.
+        const maxRangeDays = 92;
+        const rangeDays = Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24));
+        if (rangeDays > maxRangeDays) {
+            alert('Please limit your date range to no more than 3 months.');
+            return;
+        }
 
-        // Generate placeholder good dates
+        // Generate placeholder good dates including suggested hours
         const goodDates = generateGoodDates(startDate, endDate, selectedActivities);
 
         // Render results
         renderListResults(goodDates, listContainer);
-        renderCalendar(goodDates, calendarContainer, startDate);
+        renderCalendarRange(goodDates, calendarContainer, startDate, endDate);
         resultsSection.classList.remove('hidden');
         // Scroll to results
         resultsSection.scrollIntoView({behavior: 'smooth'});
@@ -63,9 +70,26 @@ document.addEventListener('DOMContentLoaded', () => {
  */
 function generateGoodDates(start, end, activities) {
     const diffDays = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
-    const numberOfSuggestions = Math.min(6, diffDays); // maximum suggestions equal to range length but not more than 6
+    // Determine how many suggestions to return: roughly one per week if range is long
+    const maxSuggestions = 12;
+    let numberOfSuggestions;
+    if (diffDays <= 7) {
+        numberOfSuggestions = Math.min(3, diffDays);
+    } else if (diffDays <= 30) {
+        numberOfSuggestions = Math.min(6, diffDays);
+    } else {
+        numberOfSuggestions = Math.min(maxSuggestions, diffDays);
+    }
+
     const selectedDates = new Set();
     const results = [];
+
+    // Predefined time slots for demonstration purposes
+    const timeSlots = [
+        '09:00–11:00',
+        '13:00–15:00',
+        '19:00–21:00'
+    ];
 
     // Randomly select dates
     while (selectedDates.size < numberOfSuggestions) {
@@ -75,9 +99,15 @@ function generateGoodDates(start, end, activities) {
         const dateKey = candidate.toDateString();
         if (!selectedDates.has(dateKey)) {
             selectedDates.add(dateKey);
+            // Build hour recommendations per activity
+            const hourRecommendations = activities.map(act => {
+                const slot = timeSlots[Math.floor(Math.random() * timeSlots.length)];
+                return { activity: act, time: slot };
+            });
             results.push({
                 date: new Date(candidate),
-                reasons: generateReasonForDate(candidate, activities)
+                reasons: generateReasonForDate(candidate, activities),
+                hours: hourRecommendations
             });
         }
     }
@@ -123,10 +153,39 @@ function renderListResults(goodDates, container) {
     goodDates.forEach(item => {
         const li = document.createElement('li');
         const dateStr = item.date.toLocaleDateString(undefined, {year: 'numeric', month: 'long', day: 'numeric'});
-        li.innerHTML = `<strong>${dateStr}</strong>: ${item.reasons}`;
+        // Build hours string
+        let hoursHtml = '';
+        if (item.hours && item.hours.length > 0) {
+            hoursHtml = '<ul class="hours-list">';
+            item.hours.forEach(hr => {
+                const activityName = generateActivityName(hr.activity);
+                hoursHtml += `<li><em>${activityName}</em>: ${hr.time}</li>`;
+            });
+            hoursHtml += '</ul>';
+        }
+        li.innerHTML = `<strong>${dateStr}</strong>: ${item.reasons}${hoursHtml}`;
         ul.appendChild(li);
     });
     container.appendChild(ul);
+}
+
+/**
+ * Convert activity codes to human-readable names matching those in the select list.
+ *
+ * @param {string} code
+ * @returns {string}
+ */
+function generateActivityName(code) {
+    switch (code) {
+        case 'marriage': return 'Marriage';
+        case 'travel': return 'Travel';
+        case 'move': return 'Move House/Office';
+        case 'contract': return 'Signing Contract';
+        case 'business': return 'Launching New Business';
+        case 'trading': return 'Trading/Investment';
+        case 'health': return 'Health & Medical';
+        default: return code;
+    }
 }
 
 /**
@@ -197,4 +256,84 @@ function renderCalendar(goodDates, container, startDate) {
     }
     table.appendChild(tbody);
     container.appendChild(table);
+}
+
+/**
+ * Render calendars for all months within the range [startDate, endDate]. Good dates
+ * are highlighted across all months. This replaces the original renderCalendar
+ * for multi‑month support.
+ *
+ * @param {Array<{date: Date}>} goodDates
+ * @param {HTMLElement} container
+ * @param {Date} startDate
+ * @param {Date} endDate
+ */
+function renderCalendarRange(goodDates, container, startDate, endDate) {
+    container.innerHTML = '';
+    // Map of date strings for quick lookup
+    const goodDateSet = new Set(goodDates.map(item => item.date.toDateString()));
+    // Clone start and end to avoid modifying originals
+    let current = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    const last = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+
+    // Helper to render one month
+    function renderMonth(date) {
+        const year = date.getFullYear();
+        const month = date.getMonth();
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        const firstDayIndex = firstDay.getDay();
+        const totalDays = lastDay.getDate();
+        const table = document.createElement('table');
+        // Month label
+        const caption = document.createElement('caption');
+        caption.textContent = firstDay.toLocaleDateString(undefined, { year: 'numeric', month: 'long' });
+        table.appendChild(caption);
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+        dayNames.forEach(d => {
+            const th = document.createElement('th');
+            th.textContent = d;
+            headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+        const tbody = document.createElement('tbody');
+        let dateCounter = 1;
+        for (let i = 0; i < 6; i++) {
+            const row = document.createElement('tr');
+            for (let j = 0; j < 7; j++) {
+                const cell = document.createElement('td');
+                if (i === 0 && j < firstDayIndex) {
+                    cell.textContent = '';
+                } else if (dateCounter > totalDays) {
+                    cell.textContent = '';
+                } else {
+                    const currentDate = new Date(year, month, dateCounter);
+                    cell.textContent = dateCounter;
+                    if (goodDateSet.has(currentDate.toDateString())) {
+                        cell.classList.add('good-date');
+                        // Optionally add a tooltip indicating there are recommended hours
+                        cell.title = 'Favorable day';
+                    }
+                    dateCounter++;
+                }
+                row.appendChild(cell);
+            }
+            tbody.appendChild(row);
+            if (dateCounter > totalDays) {
+                break;
+            }
+        }
+        table.appendChild(tbody);
+        container.appendChild(table);
+    }
+
+    // Loop through each month until we surpass end month
+    while (current <= last) {
+        renderMonth(current);
+        // Move to the next month
+        current = new Date(current.getFullYear(), current.getMonth() + 1, 1);
+    }
 }

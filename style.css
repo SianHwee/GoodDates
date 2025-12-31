@@ -140,6 +140,27 @@ button#submitBtn:hover {
     font-weight: bold;
 }
 
+/* Hours list styling within the recommended dates */
+.hours-list {
+    margin-top: 0.25rem;
+    padding-left: 1rem;
+    list-style-type: disc;
+    color: #555;
+    font-size: 0.9rem;
+}
+.hours-list li {
+    margin-bottom: 0.25rem;
+}
+
+/* Calendar caption styling */
+#calendarContainer caption {
+    caption-side: top;
+    font-weight: bold;
+    text-align: left;
+    padding: 0.5rem 0;
+    font-size: 1.1rem;
+}
+
 footer {
     text-align: center;
     padding: 1rem;
