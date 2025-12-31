@@ -95,6 +95,46 @@ document.addEventListener('DOMContentLoaded', () => {
     // Call population of override options on load
     populateOverrideOptions();
 
+    // ----------------------------------------------------------------------
+    // Define metaphysical influences used in the explanation generator. These
+    // arrays are referenced by generateReasonForDate() when constructing
+    // auspicious or inauspicious reasoning for each date. In a real
+    // implementation you would derive these from the Qi Men Dun Jia and BaZi
+    // charts. Here we list common terms for demonstration purposes.
+    window.qiMenDoors = [
+        'Open Door',      // 開門 – brings opportunities and successful ventures
+        'Rest Door',      // 休門 – promotes relaxation and recuperation
+        'Life Door',      // 生門 – favors growth and prosperity
+        'Harm Door',      // 傷門 – associated with minor obstacles
+        'Delusion Door',  // 杜門 – may cause confusion or delays
+        'Scene Door',     // 景門 – tied to fame and visibility
+        'Death Door',     // 死門 – connected to endings or closures
+        'Fear Door'       // 驚門 – denotes shocks or disruptions
+    ];
+    window.qiMenStars = [
+        'Chief Star',     // 天蓬 – leadership and authority
+        'Surprise Star',  // 天任 – unexpected luck and responsibility
+        'Snake Star',     // 天冲 – cunning and strategy
+        'Tiger Star',     // 天輔 – bravery and support
+        'Pheasant Star',  // 天英 – recognition and honor
+        'Tortoise Star',  // 天禽 – hidden or mysterious influences
+        'Dragon Star',    // 天心 – intellect and planning
+        'Earth Star'      // 天芮 – grounding and stability
+    ];
+    window.qiMenDeities = [
+        'Chief Deity',    // 值符 – order and authority
+        'Surprise Deity', // 螣蛇 – surprise and unpredictability
+        'Snake Deity',    // 太陰 – introspection and secrets
+        'Tiger Deity',    // 白虎 – aggression and caution
+        'Pheasant Deity', // 玄武 – communication and networking
+        'Tortoise Deity', // 九地 – long term projects and patience
+        'Dragon Deity',   // 九天 – ambition and vision
+        'Earth Deity'     // 天乙 – protection and blessings
+    ];
+    window.baziElements = [
+        'Wood', 'Fire', 'Earth', 'Metal', 'Water'
+    ];
+
     // Load previously saved profile if available
     loadProfile();
 
@@ -284,10 +324,10 @@ function generateReasonForDate(date, activities, isBad = false) {
     const deity = qiMenDeities[Math.floor(Math.random() * qiMenDeities.length)];
     const element = baziElements[Math.floor(Math.random() * baziElements.length)];
     if (isBad) {
-        // Negative day: caution message
-        return `Unfavorable influences for ${activitiesList.join(', ')} due to the presence of the ${door}, ${star} star and ${deity}, which clash with your ${element} element on this day.`;
+        // Negative day: caution message. We explicitly tell the user to avoid the selected activities.
+        return `Unfavorable influences for ${activitiesList.join(', ')}. Avoid these activities on this day because the ${door} together with the ${star} star and ${deity} clash with your ${element} element.`;
     } else {
-        return `Auspicious influences for ${activitiesList.join(', ')} thanks to the ${door}, supported by the ${star} star and ${deity} with harmonious ${element} element energies.`;
+        return `Auspicious influences for ${activitiesList.join(', ')} thanks to the ${door}, supported by the ${star} star and ${deity}, all harmonizing with your ${element} element energies.`;
     }
 }
 
@@ -474,12 +514,19 @@ function renderExplanations(goodDates) {
     const ul = document.createElement('ul');
     goodDates.forEach(item => {
         const dateStr = item.date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
-        // Build a more descriptive explanation incorporating the generated reasons and time slots
-        let explanation = `On ${dateStr}, ${item.reasons} Recommended times:`;
-        item.hours.forEach(hr => {
-            const activityName = generateActivityName(hr.activity);
-            explanation += ` ${activityName} between ${hr.time};`;
-        });
+        // Build a descriptive explanation. If the day is marked bad, we
+        // emphasize avoidance and do not list hours. Otherwise we include
+        // recommended time slots for each activity.
+        let explanation;
+        if (item.bad) {
+            explanation = `On ${dateStr}, this is an unfavorable day: ${item.reasons}`;
+        } else {
+            explanation = `On ${dateStr}, ${item.reasons} Recommended times:`;
+            item.hours.forEach(hr => {
+                const activityName = generateActivityName(hr.activity);
+                explanation += ` ${activityName} between ${hr.time};`;
+            });
+        }
         const li = document.createElement('li');
         li.textContent = explanation;
         ul.appendChild(li);
