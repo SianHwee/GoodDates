@@ -166,26 +166,28 @@ document.addEventListener('DOMContentLoaded', () => {
  */
 function generateGoodDates(start, end, activities) {
     const diffDays = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
-    // Determine how many suggestions to return: roughly one per week if range is long
-    const maxSuggestions = 12;
-    let numberOfSuggestions;
-    if (diffDays <= 7) {
-        numberOfSuggestions = Math.min(3, diffDays);
-    } else if (diffDays <= 30) {
-        numberOfSuggestions = Math.min(6, diffDays);
-    } else {
-        numberOfSuggestions = Math.min(maxSuggestions, diffDays);
-    }
-
-    const selectedDates = new Set();
     const results = [];
 
+    // Determine whether trading is among the activities. If so, we will
+    // produce entries for every day in the range. Otherwise we will
+    // generate a limited number of random dates like before.
+    const tradingSelected = activities.includes('trading');
+    let numberOfSuggestions;
+    if (tradingSelected) {
+        numberOfSuggestions = diffDays;
+    } else {
+        const maxSuggestions = 12;
+        if (diffDays <= 7) {
+            numberOfSuggestions = Math.min(3, diffDays);
+        } else if (diffDays <= 30) {
+            numberOfSuggestions = Math.min(6, diffDays);
+        } else {
+            numberOfSuggestions = Math.min(maxSuggestions, diffDays);
+        }
+    }
+    const selectedDates = new Set();
+
     // Predefined time slots for demonstration purposes.
-    // To provide more hourly guidance per day, this array includes
-    // additional windows across the morning, afternoon and evening. In a
-    // real implementation, these would be derived from Qi Men Dun Jia
-    // hour charts for each date. Each string uses an en dash (–) to
-    // denote a time range.
     const timeSlots = [
         '05:00–06:30',
         '07:00–08:30',
@@ -198,40 +200,57 @@ function generateGoodDates(start, end, activities) {
         '21:00–22:30'
     ];
 
-    // Randomly select dates
-    while (selectedDates.size < numberOfSuggestions) {
-        const offset = Math.floor(Math.random() * diffDays);
-        const candidate = new Date(start.getTime());
-        candidate.setDate(candidate.getDate() + offset);
-        const dateKey = candidate.toDateString();
-        if (!selectedDates.has(dateKey)) {
-            selectedDates.add(dateKey);
-            // Build hour recommendations per activity. To provide additional
-            // options, select three unique time windows for each
-            // activity. The Set ensures we don't repeat a slot within
-            // one activity’s recommendations.
-            const hourRecommendations = [];
-            activities.forEach(act => {
-                const usedSlots = new Set();
-                const slotsNeeded = 3;
-                let picks = 0;
-                while (picks < slotsNeeded) {
-                    const slot = timeSlots[Math.floor(Math.random() * timeSlots.length)];
-                    if (!usedSlots.has(slot)) {
-                        usedSlots.add(slot);
-                        hourRecommendations.push({ activity: act, time: slot });
-                        picks++;
-                    }
+    // Helper to build hour recommendations for a particular day and set of activities
+    function buildHourRecommendations() {
+        const hours = [];
+        activities.forEach(act => {
+            const usedSlots = new Set();
+            const slotsNeeded = 3;
+            let picks = 0;
+            while (picks < slotsNeeded) {
+                const slot = timeSlots[Math.floor(Math.random() * timeSlots.length)];
+                if (!usedSlots.has(slot)) {
+                    usedSlots.add(slot);
+                    hours.push({ activity: act, time: slot });
+                    picks++;
                 }
-            });
-            results.push({
-                date: new Date(candidate),
-                reasons: generateReasonForDate(candidate, activities),
-                hours: hourRecommendations
-            });
-        }
+            }
+        });
+        return hours;
     }
 
+    if (tradingSelected) {
+        // Provide a suggestion for every day in the range. We also mark
+        // certain days as "bad" (to be avoided) at random (10% chance).
+        for (let i = 0; i < diffDays; i++) {
+            const currentDate = new Date(start.getTime());
+            currentDate.setDate(currentDate.getDate() + i);
+            const isBad = Math.random() < 0.1;
+            results.push({
+                date: currentDate,
+                reasons: generateReasonForDate(currentDate, activities, isBad),
+                hours: buildHourRecommendations(),
+                bad: isBad
+            });
+        }
+    } else {
+        // Generate a random subset of dates like the original logic
+        while (selectedDates.size < numberOfSuggestions) {
+            const offset = Math.floor(Math.random() * diffDays);
+            const candidate = new Date(start.getTime());
+            candidate.setDate(candidate.getDate() + offset);
+            const dateKey = candidate.toDateString();
+            if (!selectedDates.has(dateKey)) {
+                selectedDates.add(dateKey);
+                results.push({
+                    date: new Date(candidate),
+                    reasons: generateReasonForDate(candidate, activities, false),
+                    hours: buildHourRecommendations(),
+                    bad: false
+                });
+            }
+        }
+    }
     // Sort results chronologically
     results.sort((a, b) => a.date - b.date);
     return results;
@@ -245,7 +264,8 @@ function generateGoodDates(start, end, activities) {
  * @param {string[]} activities
  * @returns {string}
  */
-function generateReasonForDate(date, activities) {
+function generateReasonForDate(date, activities, isBad = false) {
+    // Convert activity codes to human-readable phrases for inclusion in the message
     const activitiesList = activities.map(act => {
         switch (act) {
             case 'marriage': return 'marriage';
@@ -258,7 +278,17 @@ function generateReasonForDate(date, activities) {
             default: return act;
         }
     });
-    return `Favorable for ${activitiesList.join(', ')} activities based on hypothetical Qi Men and BaZi alignment.`;
+    // Select random metaphysical influences for explanation
+    const door = qiMenDoors[Math.floor(Math.random() * qiMenDoors.length)];
+    const star = qiMenStars[Math.floor(Math.random() * qiMenStars.length)];
+    const deity = qiMenDeities[Math.floor(Math.random() * qiMenDeities.length)];
+    const element = baziElements[Math.floor(Math.random() * baziElements.length)];
+    if (isBad) {
+        // Negative day: caution message
+        return `Unfavorable influences for ${activitiesList.join(', ')} due to the presence of the ${door}, ${star} star and ${deity}, which clash with your ${element} element on this day.`;
+    } else {
+        return `Auspicious influences for ${activitiesList.join(', ')} thanks to the ${door}, supported by the ${star} star and ${deity} with harmonious ${element} element energies.`;
+    }
 }
 
 /**
@@ -282,6 +312,10 @@ function renderListResults(goodDates, container) {
                 hoursHtml += `<li><em>${activityName}</em>: ${hr.time}</li>`;
             });
             hoursHtml += '</ul>';
+        }
+        // Add a CSS class for bad days to visually differentiate them
+        if (item.bad) {
+            li.classList.add('bad-day');
         }
         li.innerHTML = `<strong>${dateStr}</strong>: ${item.reasons}${hoursHtml}`;
         ul.appendChild(li);
@@ -440,7 +474,8 @@ function renderExplanations(goodDates) {
     const ul = document.createElement('ul');
     goodDates.forEach(item => {
         const dateStr = item.date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
-        let explanation = `On ${dateStr}, the alignment of your BaZi chart suggests favorable energies. Recommended times:`;
+        // Build a more descriptive explanation incorporating the generated reasons and time slots
+        let explanation = `On ${dateStr}, ${item.reasons} Recommended times:`;
         item.hours.forEach(hr => {
             const activityName = generateActivityName(hr.activity);
             explanation += ` ${activityName} between ${hr.time};`;
@@ -534,8 +569,20 @@ function renderCalendar(goodDates, container, startDate) {
  */
 function renderCalendarRange(goodDates, container, startDate, endDate) {
     container.innerHTML = '';
-    // Map of date strings for quick lookup
-    const goodDateSet = new Set(goodDates.map(item => item.date.toDateString()));
+    // Create sets for good and bad dates for quick lookup. A date is
+    // considered bad if it has the `bad` flag; otherwise it is good. When
+    // trading is selected, every day will be represented, but only bad
+    // days should be highlighted specially in the calendar.
+    const goodDateSet = new Set();
+    const badDateSet = new Set();
+    goodDates.forEach(item => {
+        const key = item.date.toDateString();
+        if (item.bad) {
+            badDateSet.add(key);
+        } else {
+            goodDateSet.add(key);
+        }
+    });
     // Clone start and end to avoid modifying originals
     let current = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
     const last = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
@@ -576,9 +623,12 @@ function renderCalendarRange(goodDates, container, startDate, endDate) {
                 } else {
                     const currentDate = new Date(year, month, dateCounter);
                     cell.textContent = dateCounter;
-                    if (goodDateSet.has(currentDate.toDateString())) {
+                    const dateKey = currentDate.toDateString();
+                    if (badDateSet.has(dateKey)) {
+                        cell.classList.add('bad-date');
+                        cell.title = 'Unfavorable day to avoid';
+                    } else if (goodDateSet.has(dateKey)) {
                         cell.classList.add('good-date');
-                        // Optionally add a tooltip indicating there are recommended hours
                         cell.title = 'Favorable day';
                     }
                     dateCounter++;

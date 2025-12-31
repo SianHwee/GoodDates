@@ -140,6 +140,17 @@ button#submitBtn:hover {
     font-weight: bold;
 }
 
+/* Highlight days that are considered bad/unfavorable */
+#listResults li.bad-day {
+    background: #f9e6e6;
+    border-left-color: #d9534f;
+}
+#calendarContainer td.bad-date {
+    background: #f9e0e0;
+    color: #d9534f;
+    font-weight: bold;
+}
+
 /* Hours list styling within the recommended dates */
 .hours-list {
     margin-top: 0.25rem;
