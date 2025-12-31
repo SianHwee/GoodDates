@@ -19,6 +19,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Define global arrays for stems and branches for override dropdowns
     const stemsList = ['Jia','Yi','Bing','Ding','Wu','Ji','Geng','Xin','Ren','Gui'];
     const branchesList = ['Zi','Chou','Yin','Mao','Chen','Si','Wu','Wei','Shen','You','Xu','Hai'];
+    // Expose lists globally for use in other helper functions
+    window.stemsList = stemsList;
+    window.branchesList = branchesList;
 
     // Populate override select options on load
     function populateOverrideOptions() {
@@ -64,7 +67,16 @@ document.addEventListener('DOMContentLoaded', () => {
         // Render override chart
         renderBaZiChart(overrideChart);
         document.getElementById('bazi-section').classList.remove('hidden');
-        // Recalculate good dates with same range and activities using override (still placeholder logic)
+        // Update the Day Master element according to the override chart (Day pillar index 2)
+        let overrideDayElement = '';
+        try {
+            const overrideDayStem = overrideChart[2].stem;
+            overrideDayElement = mapStemToElement(overrideDayStem);
+        } catch (err) {
+            overrideDayElement = '';
+        }
+        window.userDayElement = overrideDayElement;
+        // Recalculate good dates with the same range and activities using override
         // Fetch current form values
         const startDateStr = document.getElementById('startDate').value;
         const endDateStr = document.getElementById('endDate').value;
@@ -82,7 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Please limit your date range to no more than 3 months.');
             return;
         }
-        // Generate new placeholder good dates
+        // Generate new good dates using the updated Day Master element
         const goodDates = generateGoodDates(startDate, endDate, selectedActivities);
         // Update results and explanations
         renderListResults(goodDates, listContainer);
@@ -135,6 +147,77 @@ document.addEventListener('DOMContentLoaded', () => {
         'Wood', 'Fire', 'Earth', 'Metal', 'Water'
     ];
 
+    // Map each door, star and deity to a primary Five Elements association. These
+    // values are used when comparing the door against the user's Day Master
+    // element to determine whether a date/hour is favourable. The mapping
+    // here is simplified for demonstration purposes only; authentic Qi Men
+    // systems may have more nuanced associations.
+    window.doorElementMap = {
+        'Open Door': 'Fire',      // openings relate to expansion and brightness
+        'Rest Door': 'Wood',      // recuperation and growth
+        'Life Door': 'Wood',      // new life and vitality
+        'Harm Door': 'Metal',     // injury and cutting
+        'Delusion Door': 'Water', // confusion and obscurity
+        'Scene Door': 'Fire',     // visibility and fame
+        'Death Door': 'Earth',    // endings and earth
+        'Fear Door': 'Water'      // fear and emotions
+    };
+
+    // Associate stars to elements (very simplified; real mappings are complex).
+    window.starElementMap = {
+        'Chief Star': 'Wood',
+        'Surprise Star': 'Water',
+        'Snake Star': 'Fire',
+        'Tiger Star': 'Metal',
+        'Pheasant Star': 'Fire',
+        'Tortoise Star': 'Water',
+        'Dragon Star': 'Earth',
+        'Earth Star': 'Earth'
+    };
+
+    // Associate deities to elements (simplified).
+    window.deityElementMap = {
+        'Chief Deity': 'Wood',
+        'Surprise Deity': 'Water',
+        'Snake Deity': 'Fire',
+        'Tiger Deity': 'Metal',
+        'Pheasant Deity': 'Fire',
+        'Tortoise Deity': 'Water',
+        'Dragon Deity': 'Earth',
+        'Earth Deity': 'Earth'
+    };
+
+    /**
+     * Convert a Heavenly Stem to its corresponding Five Element. This
+     * mapping follows the conventional grouping where Jia/Yi correspond to
+     * Wood, Bing/Ding to Fire, Wu/Ji to Earth, Geng/Xin to Metal and
+     * Ren/Gui to Water.
+     *
+     * @param {string} stem
+     * @returns {string}
+     */
+    window.mapStemToElement = function (stem) {
+        switch (stem) {
+            case 'Jia':
+            case 'Yi':
+                return 'Wood';
+            case 'Bing':
+            case 'Ding':
+                return 'Fire';
+            case 'Wu':
+            case 'Ji':
+                return 'Earth';
+            case 'Geng':
+            case 'Xin':
+                return 'Metal';
+            case 'Ren':
+            case 'Gui':
+                return 'Water';
+            default:
+                return '';
+        }
+    };
+
     // Load previously saved profile if available
     loadProfile();
 
@@ -180,6 +263,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const baziChart = calculateBaZi(dobStr, timeStr);
         renderBaZiChart(baziChart);
         document.getElementById('bazi-section').classList.remove('hidden');
+        // Determine the user's Day Master element from the Day pillar of the
+        // computed BaZi chart. The Day pillar is at index 2 of the chart.
+        let dayMasterElement = '';
+        try {
+            const dayStem = baziChart[2].stem;
+            dayMasterElement = mapStemToElement(dayStem);
+        } catch (err) {
+            dayMasterElement = '';
+        }
+        // Store globally for use in the date selection logic
+        window.userDayElement = dayMasterElement;
 
         // Generate explanations for each good date/time
         renderExplanations(goodDates);
@@ -209,8 +303,8 @@ function generateGoodDates(start, end, activities) {
     const results = [];
 
     // Determine whether trading is among the activities. If so, we will
-    // produce entries for every day in the range. Otherwise we will
-    // generate a limited number of random dates like before.
+    // provide an entry for every day in the range. Otherwise we will
+    // generate a limited subset of dates.
     const tradingSelected = activities.includes('trading');
     let numberOfSuggestions;
     if (tradingSelected) {
@@ -227,54 +321,178 @@ function generateGoodDates(start, end, activities) {
     }
     const selectedDates = new Set();
 
-    // Predefined time slots for demonstration purposes.
-    const timeSlots = [
-        '05:00–06:30',
-        '07:00–08:30',
-        '09:00–10:30',
-        '11:00–12:30',
-        '13:00–14:30',
-        '15:00–16:30',
-        '17:00–18:30',
-        '19:00–20:30',
-        '21:00–22:30'
+    // Predefined two‑hour time slots for each day. Each slot has a corresponding
+    // Qi Men influence triple (door, star, deity). These assignments are
+    // illustrative rather than canonical but provide a deterministic mapping
+    // instead of purely random selection. They roughly follow the sequence of
+    // the eight doors, eight stars and eight deities and repeat across the
+    // available slots. If you wish to adjust the mapping to align with
+    // specific schools, update the entries in this array.
+    const slotDefinitions = [
+        { time: '05:00–06:30', door: 'Open Door',    star: 'Chief Star',    deity: 'Chief Deity'    },
+        { time: '07:00–08:30', door: 'Rest Door',    star: 'Surprise Star', deity: 'Surprise Deity' },
+        { time: '09:00–10:30', door: 'Life Door',    star: 'Snake Star',    deity: 'Snake Deity'    },
+        { time: '11:00–12:30', door: 'Harm Door',    star: 'Tiger Star',    deity: 'Tiger Deity'    },
+        { time: '13:00–14:30', door: 'Delusion Door',star: 'Pheasant Star',deity: 'Pheasant Deity' },
+        { time: '15:00–16:30', door: 'Scene Door',   star: 'Tortoise Star',deity: 'Tortoise Deity' },
+        { time: '17:00–18:30', door: 'Death Door',   star: 'Dragon Star',  deity: 'Dragon Deity'   },
+        { time: '19:00–20:30', door: 'Fear Door',    star: 'Earth Star',   deity: 'Earth Deity'    },
+        { time: '21:00–22:30', door: 'Open Door',    star: 'Chief Star',    deity: 'Chief Deity'    }
     ];
 
-    // Helper to build hour recommendations for a particular day and set of activities
-    function buildHourRecommendations() {
+    // Element cycles for generating and controlling relationships. These maps
+    // follow the Five Elements theory: Wood→Fire→Earth→Metal→Water→Wood. The
+    // controlling (Ke) cycle is Wood→Earth→Water→Fire→Metal→Wood. They are
+    // used in computeInfluenceScore() below.
+    const elementGenerate = {
+        'Wood': 'Fire',
+        'Fire': 'Earth',
+        'Earth': 'Metal',
+        'Metal': 'Water',
+        'Water': 'Wood'
+    };
+    const elementControl = {
+        'Wood': 'Earth',
+        'Earth': 'Water',
+        'Water': 'Fire',
+        'Fire': 'Metal',
+        'Metal': 'Wood'
+    };
+
+    /**
+     * Compute a synergy score between the influences (door, star, deity) and
+     * the user's Day Master element. The scoring algorithm rewards matches
+     * and generating relationships and penalizes controlling relationships.
+     * Door matches are weighted more heavily than star or deity matches
+     * because doors are considered the primary influence on timing.
+     *
+     * @param {string} doorEl
+     * @param {string} starEl
+     * @param {string} deityEl
+     * @param {string} userEl
+     * @returns {number}
+     */
+    function computeInfluenceScore(doorEl, starEl, deityEl, userEl) {
+        let score = 0;
+        // Door synergy
+        if (doorEl === userEl) {
+            score += 2;
+        } else if (elementGenerate[doorEl] === userEl) {
+            // Door generates user element
+            score += 1;
+        } else if (elementGenerate[userEl] === doorEl) {
+            // User generates door element (supportive but less potent)
+            score += 0.5;
+        } else if (elementControl[doorEl] === userEl) {
+            // Door controls user element (negative influence)
+            score -= 2;
+        } else if (elementControl[userEl] === doorEl) {
+            // User controls door element (still an obstacle)
+            score -= 1;
+        }
+        // Star synergy
+        if (starEl === userEl) {
+            score += 1;
+        } else if (elementGenerate[starEl] === userEl) {
+            score += 0.5;
+        } else if (elementControl[starEl] === userEl) {
+            score -= 0.5;
+        }
+        // Deity synergy
+        if (deityEl === userEl) {
+            score += 1;
+        } else if (elementGenerate[deityEl] === userEl) {
+            score += 0.5;
+        } else if (elementControl[deityEl] === userEl) {
+            score -= 0.5;
+        }
+        return score;
+    }
+
+    /**
+     * Build hour recommendations for a given day and selected activities. For each
+     * activity we pick three unique time slots from slotDefinitions. We also
+     * compute the influence score per slot and accumulate it so the date
+     * scoring can consider the quality of each chosen window.
+     *
+     * @param {string[]} activities
+     * @param {string} userEl - Day Master element
+     * @returns {{hours: Array<{activity:string,time:string,door:string,star:string,deity:string,score:number}>, totalScore:number}}
+     */
+    function buildHourRecommendationsWithScore(activities, userEl) {
         const hours = [];
+        let totalScore = 0;
         activities.forEach(act => {
-            const usedSlots = new Set();
+            const usedIndexes = new Set();
             const slotsNeeded = 3;
             let picks = 0;
             while (picks < slotsNeeded) {
-                const slot = timeSlots[Math.floor(Math.random() * timeSlots.length)];
-                if (!usedSlots.has(slot)) {
-                    usedSlots.add(slot);
-                    hours.push({ activity: act, time: slot });
+                const idx = Math.floor(Math.random() * slotDefinitions.length);
+                if (!usedIndexes.has(idx)) {
+                    usedIndexes.add(idx);
+                    const slotDef = slotDefinitions[idx];
+                    // Determine element associations for the selected door, star and deity
+                    const doorEl = doorElementMap[slotDef.door] || '';
+                    const starEl = starElementMap[slotDef.star] || '';
+                    const deityEl = deityElementMap[slotDef.deity] || '';
+                    // Compute influence score for this slot
+                    const slotScore = computeInfluenceScore(doorEl, starEl, deityEl, userEl);
+                    totalScore += slotScore;
+                    hours.push({
+                        activity: act,
+                        time: slotDef.time,
+                        door: slotDef.door,
+                        star: slotDef.star,
+                        deity: slotDef.deity,
+                        score: slotScore
+                    });
                     picks++;
                 }
             }
         });
-        return hours;
+        return { hours, totalScore };
     }
 
     if (tradingSelected) {
-        // Provide a suggestion for every day in the range. We also mark
-        // certain days as "bad" (to be avoided) at random (10% chance).
+        // For trading, evaluate every day in the range. We determine whether
+        // the day is favourable based on the aggregate influence score from
+        // the selected time slots. An additional small random chance remains
+        // to mark a day as bad to simulate unpredictability.
         for (let i = 0; i < diffDays; i++) {
             const currentDate = new Date(start.getTime());
             currentDate.setDate(currentDate.getDate() + i);
-            const isBad = Math.random() < 0.1;
+            // Determine the day pillar (stem and branch) for the candidate date.
+            const dayInfo = computeDayStemBranch(currentDate);
+            const dayBranch = dayInfo.branch;
+            // Determine Yuan classification based on day branch
+            const yuan = classifyYuan(dayBranch);
+            // Build hour recommendations with influence scoring
+            const { hours, totalScore } = buildHourRecommendationsWithScore(activities, window.userDayElement || '');
+            // Choose the first slot's influences as the primary ones for explanation
+            const primary = hours[0] || {};
+            const door = primary.door || qiMenDoors[Math.floor(Math.random() * qiMenDoors.length)];
+            const star = primary.star || qiMenStars[Math.floor(Math.random() * qiMenStars.length)];
+            const deity = primary.deity || qiMenDeities[Math.floor(Math.random() * qiMenDeities.length)];
+            const doorElement = doorElementMap[door] || '';
+            const starElement = starElementMap[star] || '';
+            const deityElement = deityElementMap[deity] || '';
+            // Evaluate if the day is bad: non‑positive total score or a small random chance
+            const isBad = (totalScore <= 0) || (Math.random() < 0.03);
+            // Build detailed reason string
+            const reason = buildReason(activities, door, star, deity, doorElement, starElement, deityElement, dayBranch, yuan, window.userDayElement || '', totalScore > 0);
+            // Strip influences from hours for display purposes
+            const simpleHours = hours.map(h => ({ activity: h.activity, time: h.time }));
             results.push({
                 date: currentDate,
-                reasons: generateReasonForDate(currentDate, activities, isBad),
-                hours: buildHourRecommendations(),
+                reasons: reason,
+                hours: simpleHours,
                 bad: isBad
             });
         }
     } else {
-        // Generate a random subset of dates like the original logic
+        // Generate a random subset of dates for non-trading activities. Each
+        // selected day uses the same scoring method as trading days to
+        // determine whether it is favourable.
         while (selectedDates.size < numberOfSuggestions) {
             const offset = Math.floor(Math.random() * diffDays);
             const candidate = new Date(start.getTime());
@@ -282,11 +500,29 @@ function generateGoodDates(start, end, activities) {
             const dateKey = candidate.toDateString();
             if (!selectedDates.has(dateKey)) {
                 selectedDates.add(dateKey);
+                // Determine the day pillar for this date
+                const dayInfo = computeDayStemBranch(candidate);
+                const dayBranch = dayInfo.branch;
+                const yuan = classifyYuan(dayBranch);
+                // Build hour recommendations with influence scoring
+                const { hours, totalScore } = buildHourRecommendationsWithScore(activities, window.userDayElement || '');
+                // Choose primary slot for explanation
+                const primary = hours[0] || {};
+                const door = primary.door || qiMenDoors[Math.floor(Math.random() * qiMenDoors.length)];
+                const star = primary.star || qiMenStars[Math.floor(Math.random() * qiMenStars.length)];
+                const deity = primary.deity || qiMenDeities[Math.floor(Math.random() * qiMenDeities.length)];
+                const doorElement = doorElementMap[door] || '';
+                const starElement = starElementMap[star] || '';
+                const deityElement = deityElementMap[deity] || '';
+                // Determine bad day if total score is non‑positive
+                const isBad = (totalScore <= 0);
+                const reason = buildReason(activities, door, star, deity, doorElement, starElement, deityElement, dayBranch, yuan, window.userDayElement || '', totalScore > 0);
+                const simpleHours = hours.map(h => ({ activity: h.activity, time: h.time }));
                 results.push({
                     date: new Date(candidate),
-                    reasons: generateReasonForDate(candidate, activities, false),
-                    hours: buildHourRecommendations(),
-                    bad: false
+                    reasons: reason,
+                    hours: simpleHours,
+                    bad: isBad
                 });
             }
         }
@@ -696,5 +932,86 @@ function renderCalendarRange(goodDates, container, startDate, endDate) {
         renderMonth(current);
         // Move to the next month
         current = new Date(current.getFullYear(), current.getMonth() + 1, 1);
+    }
+}
+
+/**
+ * Compute the day pillar (stem and branch) for a given Date object using a
+ * simplified algorithm. This function replicates the basic method used in
+ * calculateBaZi() to derive the day pillar. Note: This is only an
+ * approximation and does not account for all complexities of the sexagenary
+ * cycle.
+ *
+ * @param {Date} dateObj
+ * @returns {{stem: string, branch: string}}
+ */
+function computeDayStemBranch(dateObj) {
+    const year = dateObj.getFullYear();
+    const month = dateObj.getMonth() + 1; // 1-12
+    const day = dateObj.getDate();
+    // Derive indices similarly to calculateBaZi()
+    const yearStemIndex = (year - 4) % 10;
+    const yearBranchIndex = (year - 4) % 12;
+    const monthStemIndex = (month + yearStemIndex) % 10;
+    const monthBranchIndex = (month + 1) % 12;
+    const dayStemIndex = (day + monthStemIndex) % 10;
+    const dayBranchIndex = (day + monthBranchIndex) % 12;
+    const stem = window.stemsList[(dayStemIndex + 10) % 10];
+    const branch = window.branchesList[(dayBranchIndex + 12) % 12];
+    return { stem, branch };
+}
+
+/**
+ * Classify the Yuan (cycle) based on the day branch according to the
+ * Chai Bu system. Upper Yuan for Zi, Wu, Mao, You; Middle Yuan for
+ * Yin, Shen, Si, Hai; Lower Yuan for Chen, Xu, Chou, Wei.
+ *
+ * @param {string} branch
+ * @returns {string}
+ */
+function classifyYuan(branch) {
+    const upper = ['Zi','Wu','Mao','You'];
+    const middle = ['Yin','Shen','Si','Hai'];
+    const lower = ['Chen','Xu','Chou','Wei'];
+    if (upper.includes(branch)) return 'Upper';
+    if (middle.includes(branch)) return 'Middle';
+    return 'Lower';
+}
+
+/**
+ * Build an explanatory reason string for a given set of influences. Incorporates
+ * the activities, Qi Men door, star and deity, the door's element, the
+ * day branch and Yuan, and whether the energies are harmonious with the
+ * user's Day Master element.
+ *
+ * @param {string[]} activities
+ * @param {string} door
+ * @param {string} star
+ * @param {string} deity
+ * @param {string} doorElement
+ * @param {string} dayBranch
+ * @param {string} yuan
+ * @param {boolean} synergy
+ * @returns {string}
+ */
+function buildReason(activities, door, star, deity, doorElement, starElement, deityElement, dayBranch, yuan, userElement, favourable) {
+    // Convert activity codes to human‑readable phrases
+    const activitiesList = activities.map(act => {
+        switch (act) {
+            case 'marriage': return 'marriage';
+            case 'travel': return 'travel';
+            case 'move': return 'moving house/office';
+            case 'contract': return 'signing a contract';
+            case 'business': return 'launching a new business';
+            case 'trading': return 'trading or investment';
+            case 'health': return 'health matters';
+            default: return act;
+        }
+    });
+    // Compose explanation based on favourability and elemental interactions
+    if (favourable) {
+        return `Auspicious influences for ${activitiesList.join(', ')} because the ${door} (${doorElement}) door, accompanied by the ${star} (${starElement}) star and ${deity} (${deityElement}), harmonises with your Day Master element ${userElement}. This day falls in the ${yuan} Yuan (${dayBranch} branch).`;
+    } else {
+        return `Unfavourable influences for ${activitiesList.join(', ')}. The ${door} (${doorElement}) door, together with the ${star} (${starElement}) star and ${deity} (${deityElement}), clashes with your Day Master element ${userElement}. This day falls in the ${yuan} Yuan (${dayBranch} branch).`;
     }
 }
