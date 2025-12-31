@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auspicious Date Finder</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>Auspicious Date &amp; Time Finder</h1>
+        <p class="subtitle">Generate personal good dates based on BaZi and Qi Men Dun Jia principles</p>
+    </header>
+    <main>
+        <section id="input-section">
+            <h2>Enter Your Details</h2>
+            <form id="dateForm">
+                <div class="form-group">
+                    <label for="dob">Date of Birth:</label>
+                    <input type="date" id="dob" required>
+                </div>
+                <div class="form-group">
+                    <label for="birthTime">Time of Birth:</label>
+                    <input type="time" id="birthTime" step="60" required>
+                </div>
+                <div class="form-group">
+                    <label for="gender">Gender:</label>
+                    <select id="gender" required>
+                        <option value="" disabled selected>Select</option>
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="location">Birth Location:</label>
+                    <input type="text" id="location" placeholder="City, Country" required>
+                </div>
+                <div class="form-group">
+                    <label for="activities">Select Activities:</label>
+                    <select id="activities" multiple required>
+                        <option value="marriage">Marriage</option>
+                        <option value="travel">Travel</option>
+                        <option value="move">Move House/Office</option>
+                        <option value="contract">Signing Contract</option>
+                        <option value="business">Launching New Business</option>
+                        <option value="trading">Trading/Investment</option>
+                        <option value="health">Health &amp; Medical</option>
+                    </select>
+                    <small class="help-text">Hold Ctrl (Windows) or Command (Mac) to select multiple activities.</small>
+                </div>
+                <div class="form-group">
+                    <label for="startDate">Start Date:</label>
+                    <input type="date" id="startDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="endDate">End Date:</label>
+                    <input type="date" id="endDate" required>
+                </div>
+                <button type="submit" id="submitBtn">Find Good Dates</button>
+            </form>
+        </section>
+        <section id="results-section" class="hidden">
+            <h2>Recommended Dates</h2>
+            <div id="listResults"></div>
+            <h2>Calendar View</h2>
+            <div id="calendarContainer"></div>
+        </section>
+    </main>
+    <footer>
+        <p>Disclaimer: This tool provides general guidance based on traditional metaphysics and should not be considered professional advice. Always exercise judgement and consult experts when making important decisions.</p>
+    </footer>
+    <script src="script.js"></script>
+</body>
+</html>
