@@ -180,13 +180,22 @@ function generateGoodDates(start, end, activities) {
     const selectedDates = new Set();
     const results = [];
 
-    // Predefined time slots for demonstration purposes
+    // Predefined time slots for demonstration purposes.
+    // To provide more hourly guidance per day, this array includes
+    // additional windows across the morning, afternoon and evening. In a
+    // real implementation, these would be derived from Qi Men Dun Jia
+    // hour charts for each date. Each string uses an en dash (–) to
+    // denote a time range.
     const timeSlots = [
+        '05:00–06:30',
         '07:00–08:30',
-        '09:00–11:00',
-        '13:00–15:00',
-        '16:00–18:00',
-        '19:00–21:00'
+        '09:00–10:30',
+        '11:00–12:30',
+        '13:00–14:30',
+        '15:00–16:30',
+        '17:00–18:30',
+        '19:00–20:30',
+        '21:00–22:30'
     ];
 
     // Randomly select dates
@@ -197,19 +206,22 @@ function generateGoodDates(start, end, activities) {
         const dateKey = candidate.toDateString();
         if (!selectedDates.has(dateKey)) {
             selectedDates.add(dateKey);
-            // Build hour recommendations per activity
-            // Generate multiple time slots per activity to offer more options per day
+            // Build hour recommendations per activity. To provide additional
+            // options, select three unique time windows for each
+            // activity. The Set ensures we don't repeat a slot within
+            // one activity’s recommendations.
             const hourRecommendations = [];
             activities.forEach(act => {
-                // pick two unique slots for each activity
                 const usedSlots = new Set();
-                for (let k = 0; k < 2; k++) {
-                    let slot;
-                    do {
-                        slot = timeSlots[Math.floor(Math.random() * timeSlots.length)];
-                    } while (usedSlots.has(slot));
-                    usedSlots.add(slot);
-                    hourRecommendations.push({ activity: act, time: slot });
+                const slotsNeeded = 3;
+                let picks = 0;
+                while (picks < slotsNeeded) {
+                    const slot = timeSlots[Math.floor(Math.random() * timeSlots.length)];
+                    if (!usedSlots.has(slot)) {
+                        usedSlots.add(slot);
+                        hourRecommendations.push({ activity: act, time: slot });
+                        picks++;
+                    }
                 }
             });
             results.push({
